@@ -43,6 +43,11 @@ public:
                 DivideStrategy divideStrategy, String networkFilePath,
                 String propertyFilePath, unsigned verbosity );
 
+    DnCManager(unsigned numWorkers, unsigned initialDivides,
+        unsigned intialTimeout, unsigned onlineDivides, float timeoutFactor,
+        DivideStrategy divideStrategy, InputQuery initialQuery,
+        unsigned verbosity);
+
     ~DnCManager();
 
     void freeMemoryIfNeeded();
@@ -182,6 +187,8 @@ private:
       The level of verbosity
     */
     unsigned _verbosity;
+
+    bool _initializedWithQuery;
 };
 
 #endif // __DnCManager_h__

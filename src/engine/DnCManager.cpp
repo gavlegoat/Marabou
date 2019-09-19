@@ -62,7 +62,46 @@ DnCManager::DnCManager( unsigned numWorkers, unsigned initialDivides,
     , _timeoutReached( false )
     , _numUnsolvedSubQueries( 0 )
     , _verbosity( verbosity )
+    , _initializedWithQuery(false)
 {
+}
+
+DnCManager::DnCManager(unsigned numWorkers, unsigned initialDivides,
+        unsigned initialTimeout, unsigned onlineDivides, float timeoutFactor,
+        DivideStrategy divideStrategy, InputQuery initialQuery,
+        unsigned verbosity)
+  : _numWorkers( numWorkers )
+  , _initialDivides( initialDivides )
+  , _initialTimeout( initialTimeout )
+  , _onlineDivides( onlineDivides )
+  , _timeoutFactor( timeoutFactor )
+  , _divideStrategy( divideStrategy )
+  , _networkFilePath( "" )
+  , _propertyFilePath( "" )
+  , _exitCode( DnCManager::NOT_DONE )
+  , _workload( NULL )
+  , _timeoutReached( false )
+  , _numUnsolvedSubQueries( 0 )
+  , _verbosity( verbosity )
+  , _initializedWithQuery(true) {
+
+    // Create the base engine
+    _baseEngine = std::make_shared<Engine>();
+    if ( _baseEngine->processInputQuery( initialQuery ) ) {
+
+        // Create engines for each thread
+        for ( unsigned i = 0; i < _numWorkers; ++i )
+        {
+            auto engine = std::make_shared<Engine>( _verbosity );
+            InputQuery *inputQuery = new InputQuery();
+            *inputQuery = initialQuery;
+            engine->processInputQuery( *inputQuery );
+            _engines.append( engine );
+        }
+
+    } else {
+        _exitCode = DnCManager::UNSAT;
+    }
 }
 
 DnCManager::~DnCManager()
@@ -96,11 +135,14 @@ void DnCManager::solve( unsigned timeoutInSeconds )
     struct timespec startTime = TimeUtils::sampleMicro();
 
     // Preprocess the input query and create an engine for each of the threads
-    if ( !createEngines() )
+    if ( !_initializedWithQuery && !createEngines() )
     {
         _exitCode = DnCManager::UNSAT;
         printResult();
         return;
+    }
+    if (_exitCode == DnCManager::UNSAT) {
+      return;
     }
 
     // Prepare the mechanism through which we can ask the engines to quit
